@@ -1,0 +1,9 @@
+{
+  "viewBox": "0 0 118 118",
+  "t": "M14 22 H58 V34 H42 V84 H30 V34 H14 Z",
+  "a": "M60 84 L76 22 H88 L104 84 H92 L88.4 70 H75.6 L72 84 Z M78.2 60 H85.8 L82 45.3 Z",
+  "underline": { "x": 14, "y": 94, "width": 90, "height": 6, "rx": 3 },
+  "silverFrom": "#E8E8E8",
+  "silverTo": "#9A9A9A",
+  "gold": "#F4952A"
+}
