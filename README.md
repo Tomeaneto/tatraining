@@ -116,6 +116,8 @@ Você manda ao bot uma **foto** do prato ou uma **descrição** do que comeu. O 
 5. Abra uma vez no navegador: `https://<seu-app>.vercel.app/api/telegram/setup?secret=<TELEGRAM_WEBHOOK_SECRET>`. A resposta deve ter `"ok": true` e a URL do webhook.
 6. No app, em **Conectar → Telegram · Dieta**, toque em **Conectar Telegram** e depois em **Abrir no Telegram**, toque em **Iniciar** no bot e volte para tocar em Verificar.
 
+   **Sem passar pelo app:** cadastre também `TELEGRAM_LINK_TOKEN` (texto aleatório longo) e `TELEGRAM_OWNER_EMAIL` (o e-mail da sua conta no Supabase Auth), faça o redeploy e mande ao bot `/start <TELEGRAM_LINK_TOKEN>`. O chat fica ligado a essa conta.
+
 **Bot não responde?** Abra `https://<seu-app>.vercel.app/api/telegram/status?secret=<TELEGRAM_WEBHOOK_SECRET>`: ele mostra as variáveis que faltam, se o webhook está registrado (e o último erro do Telegram), se as tabelas existem, se há conta vinculada e se a chave do Gemini funciona. Os logs de cada mensagem (`[telegram] …`) ficam em **Vercel → projeto → Logs**.
 
 Comandos do bot: `/hoje` (total do dia), `/desfazer` (apaga a última refeição), `/ajuda`. Mensagens de chats não vinculados são ignoradas.

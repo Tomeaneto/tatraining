@@ -59,7 +59,11 @@ export async function GET(request: Request): Promise<Response> {
     const { count } = await db.from('telegram_links').select('*', { count: 'exact', head: true }).not('chat_id', 'is', null);
     checks.contas_vinculadas = {
       ok: (count ?? 0) > 0,
-      detail: count ? `${count}` : 'nenhuma — no app: Conectar → Telegram · Dieta → Conectar Telegram',
+      detail: count
+        ? `${count}`
+        : process.env.TELEGRAM_LINK_TOKEN
+          ? 'nenhuma — mande "/start <TELEGRAM_LINK_TOKEN>" ao bot'
+          : 'nenhuma — no app: Conectar → Telegram · Dieta → Conectar Telegram',
     };
   }
 

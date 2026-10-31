@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { json, supabaseAdmin } from '../strava/_shared.js';
 import { analyzeMeal, type Analysis, type MealType } from './_gemini.js';
@@ -180,6 +181,8 @@ async function link(db: SupabaseClient, msg: TgMessage, code: string | undefined
     return;
   }
 
+  if (isFixedLinkToken(code)) return linkOwner(db, msg);
+
   const { data: row } = await db
     .from('telegram_links')
     .select('user_id, link_code_expires_at')
@@ -202,6 +205,47 @@ async function link(db: SupabaseClient, msg: TgMessage, code: string | undefined
       link_code_expires_at: null,
     })
     .eq('user_id', row.user_id);
+  if (error) throw new Error(`Falha ao vincular: ${error.message}`);
+  await reply(chatId, `✅ Conta vinculada!\n\n${HELP}`);
+}
+
+/** `/start <TELEGRAM_LINK_TOKEN>`: token fixo da Vercel, para vincular sem passar pelo app. */
+function isFixedLinkToken(code: string): boolean {
+  const token = process.env.TELEGRAM_LINK_TOKEN;
+  if (!token) return false;
+  const a = Buffer.from(code);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** Vincula o chat à conta de TELEGRAM_OWNER_EMAIL (o usuário precisa existir no Supabase Auth). */
+async function linkOwner(db: SupabaseClient, msg: TgMessage): Promise<void> {
+  const chatId = msg.chat.id;
+  const email = process.env.TELEGRAM_OWNER_EMAIL?.trim().toLowerCase();
+  if (!email) throw new Error('TELEGRAM_OWNER_EMAIL não configurado no servidor.');
+
+  let userId: string | undefined;
+  for (let page = 1; !userId; page++) {
+    const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error(`Falha ao buscar a conta: ${error.message}`);
+    userId = data.users.find((u) => u.email?.toLowerCase() === email)?.id;
+    if (data.users.length < 1000) break;
+  }
+  if (!userId) {
+    await reply(chatId, `Nenhuma conta com o e-mail <b>${esc(email)}</b>. Entre uma vez no app (Conectar → Conta) e tente de novo.`);
+    return;
+  }
+
+  // Um chat só pode estar ligado a uma conta.
+  await db.from('telegram_links').update({ chat_id: null }).eq('chat_id', chatId).neq('user_id', userId);
+  const { error } = await db.from('telegram_links').upsert({
+    user_id: userId,
+    chat_id: chatId,
+    username: msg.from?.username ?? msg.from?.first_name ?? null,
+    linked_at: new Date().toISOString(),
+    link_code: null,
+    link_code_expires_at: null,
+  });
   if (error) throw new Error(`Falha ao vincular: ${error.message}`);
   await reply(chatId, `✅ Conta vinculada!\n\n${HELP}`);
 }
