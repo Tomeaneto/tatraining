@@ -43,10 +43,15 @@ interface MealRow {
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (!secret || request.headers.get('x-telegram-bot-api-secret-token') !== secret) {
+    console.warn('[telegram] chamada recusada: secret ausente ou diferente do TELEGRAM_WEBHOOK_SECRET');
     return json({ error: 'unauthorized' }, 401);
   }
   const update = (await request.json().catch(() => null)) as TgUpdate | null;
   const msg = update?.message;
+  console.log('[telegram] update', update?.update_id, {
+    chat: msg?.chat.id,
+    tipo: msg?.photo ? 'foto' : msg?.text?.startsWith('/') ? msg.text.split(/\s+/)[0] : msg?.text ? 'texto' : 'outro',
+  });
   // Sempre 200: um erro aqui faria o Telegram reenviar a mesma mensagem várias vezes.
   if (!msg || msg.chat.type !== 'private') return json({ ok: true });
 
