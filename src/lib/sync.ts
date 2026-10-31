@@ -489,6 +489,44 @@ export async function verifyEmailCode(email: string, token: string): Promise<voi
   if (error) throw new Error('Código inválido ou expirado.');
 }
 
+function authMessage(error: { message: string; status?: number }): string {
+  if (error.status === 429) return 'Muitas tentativas. Aguarde um minuto e tente de novo.';
+  if (/invalid login credentials/i.test(error.message)) return 'E-mail ou senha incorretos.';
+  if (/email not confirmed/i.test(error.message)) return 'Confirme o e-mail antes de entrar (veja a sua caixa de entrada).';
+  if (/already registered/i.test(error.message)) return 'Este e-mail já tem conta. Entre com a senha ou com o código.';
+  if (/password should be at least/i.test(error.message)) return 'A senha precisa ter pelo menos 6 caracteres.';
+  return error.message;
+}
+
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase não configurado.');
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(authMessage(error));
+}
+
+/** Cria a conta. Devolve `false` quando o Supabase exige confirmar o e-mail antes de entrar. */
+export async function signUpWithPassword(email: string, password: string): Promise<boolean> {
+  if (!supabase) throw new Error('Supabase não configurado.');
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${window.location.origin}/conectar` },
+  });
+  if (error) throw new Error(authMessage(error));
+  // Com a confirmação ativa, um e-mail já cadastrado volta sem erro e sem identidades.
+  if (data.user && data.user.identities?.length === 0) {
+    throw new Error('Este e-mail já tem conta. Entre com a senha ou com o código.');
+  }
+  return !!data.session;
+}
+
+/** Define ou troca a senha da conta logada (ex.: quem entrou pelo código). */
+export async function setPassword(password: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase não configurado.');
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(authMessage(error));
+}
+
 export async function signOut(): Promise<void> {
   if (!supabase) return;
   await flush();

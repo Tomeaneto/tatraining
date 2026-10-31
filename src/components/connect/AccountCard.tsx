@@ -1,8 +1,16 @@
 import { useState, type FormEvent } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CloudOff, LogOut, Mail, RefreshCw } from 'lucide-react';
-import { sendMagicLink, signOut, syncNow, verifyEmailCode } from '../../lib/sync';
+import { CloudOff, KeyRound, LogOut, Mail, RefreshCw, UserPlus } from 'lucide-react';
+import {
+  sendMagicLink,
+  setPassword,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+  syncNow,
+  verifyEmailCode,
+} from '../../lib/sync';
 import { supabase } from '../../lib/supabase';
 import { useSync } from '../../store/sync';
 import { Button } from '../ui/Button';
@@ -90,11 +98,193 @@ function SignedIn(props: { email: string; phase: string; error: string | null; l
           <LogOut size={18} aria-hidden />
         </Button>
       </div>
+      <SetPasswordForm />
     </>
   );
 }
 
+function rememberEmail(addr: string) {
+  try {
+    localStorage.setItem(EMAIL_KEY, addr);
+  } catch {
+    // sem storage, só não lembra o e-mail
+  }
+}
+
+const validEmail = (s: string) => /^\S+@\S+\.\S+$/.test(s);
+
 function SignInForm() {
+  const [mode, setMode] = useState<'password' | 'code'>('password');
+  return (
+    <>
+      <p className="mb-3 text-ta-muted">
+        Entre para guardar treinos, avaliações e configurações na nuvem e vê-los em qualquer aparelho. Sem login o app
+        continua funcionando só neste aparelho.
+      </p>
+      <div role="tablist" aria-label="Forma de entrar" className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-ta-card2 p-1">
+        {(
+          [
+            ['password', 'Senha'],
+            ['code', 'Código por e-mail'],
+          ] as const
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => setMode(m)}
+            className={`min-h-[40px] rounded-lg text-sm font-semibold uppercase tracking-wider transition-colors ${
+              mode === m ? 'bg-ta-gold text-ta-bg' : 'text-ta-muted hover:text-ta-text'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {mode === 'password' ? <PasswordForm /> : <CodeForm />}
+    </>
+  );
+}
+
+function PasswordForm() {
+  const [email, setEmail] = useState(rememberedEmail);
+  const [password, setPasswordValue] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    const addr = email.trim();
+    if (!validEmail(addr)) return setMsg({ kind: 'error', text: 'Informe um e-mail válido.' });
+    if (password.length < 6) return setMsg({ kind: 'error', text: 'A senha precisa ter pelo menos 6 caracteres.' });
+    setBusy(true);
+    setMsg(null);
+    try {
+      rememberEmail(addr);
+      if (!creating) await signInWithPassword(addr, password);
+      else if (!(await signUpWithPassword(addr, password))) {
+        setMsg({ kind: 'ok', text: `Conta criada! Confirme pelo link enviado para ${addr} e depois entre com a senha.` });
+        setCreating(false);
+      }
+    } catch (err) {
+      setMsg({ kind: 'error', text: err instanceof Error ? err.message : 'Falha ao entrar.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3" noValidate>
+      <Field label="E-mail">
+        <Input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="voce@exemplo.com"
+        />
+      </Field>
+      <Field label="Senha" hint={creating ? 'Pelo menos 6 caracteres.' : undefined}>
+        <Input
+          type="password"
+          autoComplete={creating ? 'new-password' : 'current-password'}
+          value={password}
+          onChange={(e) => setPasswordValue(e.target.value)}
+        />
+      </Field>
+      <Button type="submit" block disabled={busy}>
+        {creating ? <UserPlus size={18} aria-hidden /> : <KeyRound size={18} aria-hidden />}
+        {creating ? 'Criar conta' : 'Entrar'}
+      </Button>
+      <Button
+        variant="ghost"
+        block
+        onClick={() => {
+          setCreating(!creating);
+          setMsg(null);
+        }}
+      >
+        {creating ? 'Já tenho conta' : 'Criar conta com senha'}
+      </Button>
+      {!creating && (
+        <p className="text-sm text-ta-muted">
+          Esqueceu a senha ou só entrou por código até agora? Use <b>Código por e-mail</b> e defina a senha depois de
+          entrar.
+        </p>
+      )}
+      {msg && (
+        <p role="status" className={`text-sm ${msg.kind === 'ok' ? 'text-ta-yellow' : 'text-red-400'}`}>
+          {msg.text}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function SetPasswordForm() {
+  const [open, setOpen] = useState(false);
+  const [password, setPasswordValue] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<Msg>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (password.length < 6) return setMsg({ kind: 'error', text: 'A senha precisa ter pelo menos 6 caracteres.' });
+    if (password !== confirm) return setMsg({ kind: 'error', text: 'As senhas não conferem.' });
+    setBusy(true);
+    setMsg(null);
+    try {
+      await setPassword(password);
+      setPasswordValue('');
+      setConfirm('');
+      setOpen(false);
+      setMsg({ kind: 'ok', text: 'Senha salva. Da próxima vez, entre com e-mail e senha.' });
+    } catch (err) {
+      setMsg({ kind: 'error', text: err instanceof Error ? err.message : 'Falha ao salvar a senha.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3">
+      {open ? (
+        <form onSubmit={submit} className="space-y-3" noValidate>
+          <Field label="Nova senha" hint="Pelo menos 6 caracteres.">
+            <Input type="password" autoComplete="new-password" value={password} onChange={(e) => setPasswordValue(e.target.value)} />
+          </Field>
+          <Field label="Repita a senha">
+            <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+          </Field>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1" disabled={busy}>
+              Salvar senha
+            </Button>
+            <Button variant="secondary" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button variant="ghost" block onClick={() => setOpen(true)}>
+          <KeyRound size={18} aria-hidden />
+          Definir / trocar senha
+        </Button>
+      )}
+      {msg && (
+        <p role="status" className={`mt-2 text-sm ${msg.kind === 'ok' ? 'text-ta-yellow' : 'text-red-400'}`}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CodeForm() {
   const [email, setEmail] = useState(rememberedEmail);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -104,16 +294,12 @@ function SignInForm() {
   async function send(e: FormEvent) {
     e.preventDefault();
     const addr = email.trim();
-    if (!/^\S+@\S+\.\S+$/.test(addr)) return setMsg({ kind: 'error', text: 'Informe um e-mail válido.' });
+    if (!validEmail(addr)) return setMsg({ kind: 'error', text: 'Informe um e-mail válido.' });
     setBusy(true);
     setMsg(null);
     try {
       await sendMagicLink(addr);
-      try {
-        localStorage.setItem(EMAIL_KEY, addr);
-      } catch {
-        // sem storage, só não lembra o e-mail
-      }
+      rememberEmail(addr);
       setSentTo(addr);
       setMsg({ kind: 'ok', text: `Enviamos um link para ${addr}. Abra o e-mail neste aparelho para entrar.` });
     } catch (err) {
@@ -139,10 +325,6 @@ function SignInForm() {
 
   return (
     <>
-      <p className="mb-3 text-ta-muted">
-        Entre com o seu e-mail para guardar treinos, avaliações e configurações na nuvem e vê-los em qualquer aparelho. Sem
-        login o app continua funcionando só neste aparelho.
-      </p>
       <form onSubmit={send} className="space-y-3" noValidate>
         <Field label="E-mail">
           <Input
