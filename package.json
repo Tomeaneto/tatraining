@@ -13,6 +13,7 @@
     "@fontsource/barlow-condensed": "^5.1.0",
     "@fontsource/bebas-neue": "^5.1.0",
     "@garmin/fitsdk": "^21.218.0",
+    "@supabase/supabase-js": "^2.118.0",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",

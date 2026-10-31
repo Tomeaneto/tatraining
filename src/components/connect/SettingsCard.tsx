@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { addWeeks } from 'date-fns';
 import { Download, RotateCcw, Upload } from 'lucide-react';
 import { tanakaHrMax } from '../../data/baseline';
@@ -6,6 +6,7 @@ import { downloadBackup, parseBackup, resetAll, restoreBackup } from '../../lib/
 import { totalWeeks } from '../../lib/calendar';
 import { fromISODate } from '../../lib/dates';
 import { useSettings } from '../../store/settings';
+import { useSync } from '../../store/sync';
 import { Button } from '../ui/Button';
 import { Card, CardTitle } from '../ui/Card';
 import { Field, Input } from '../ui/Field';
@@ -16,6 +17,7 @@ type Msg = { kind: 'ok' | 'error'; text: string } | null;
 
 export function SettingsCard() {
   const { athlete, program, setAthlete, setProgram } = useSettings();
+  const signedIn = useSync((s) => s.email !== null);
   const [startDate, setStartDate] = useState(program.startDate);
   const [raceDate, setRaceDate] = useState(program.raceDate);
   const [phases, setPhases] = useState(program.phaseWeeks.map(String));
@@ -24,6 +26,18 @@ export function SettingsCard() {
   const [msg, setMsg] = useState<Msg>(null);
   const [backupMsg, setBackupMsg] = useState<Msg>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+
+  // Atualiza o formulário quando os dados mudam por fora (ex.: vindos de outro aparelho).
+  useEffect(() => {
+    setStartDate(program.startDate);
+    setRaceDate(program.raceDate);
+    setPhases(program.phaseWeeks.map(String));
+  }, [program]);
+  useEffect(() => {
+    setHrMax(String(athlete.hrMax));
+    setAge(String(athlete.age));
+  }, [athlete]);
 
   const estimate = tanakaHrMax(Number(age) || athlete.age);
 
@@ -137,7 +151,9 @@ export function SettingsCard() {
       <Card>
         <CardTitle>Backup</CardTitle>
         <p className="mb-3 text-ta-muted">
-          Os dados ficam só neste aparelho. Exporte um backup de vez em quando e guarde em local seguro.
+          {signedIn
+            ? 'Os dados estão sincronizados com a sua conta. Mesmo assim, um backup de vez em quando não faz mal.'
+            : 'Sem login, os dados ficam só neste aparelho. Exporte um backup de vez em quando e guarde em local seguro.'}
         </p>
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" onClick={downloadBackup}>
@@ -172,8 +188,7 @@ export function SettingsCard() {
           block
           onClick={() => {
             if (window.confirm('Resetar todos os dados? Esta ação não pode ser desfeita. Exporte um backup antes.')) {
-              resetAll();
-              window.location.reload();
+              void resetAll().then(() => window.location.reload());
             }
           }}
         >

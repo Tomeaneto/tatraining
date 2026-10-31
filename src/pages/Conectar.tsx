@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { AccountCard } from '../components/connect/AccountCard';
 import { GarminImportCard } from '../components/connect/GarminImportCard';
 import { SettingsCard } from '../components/connect/SettingsCard';
 import { StravaCard } from '../components/connect/StravaCard';
+import { TelegramCard } from '../components/connect/TelegramCard';
 import { PageHeader } from '../components/PageHeader';
 import { checkState, completeStravaAuth } from '../lib/strava';
 
@@ -41,9 +43,11 @@ export function Conectar() {
 
   return (
     <>
-      <PageHeader title="Conectar" subtitle="Strava, Garmin e configurações" />
+      <PageHeader title="Conectar" subtitle="Conta, Strava, Garmin e configurações" />
       <div className="space-y-3">
+        <AccountCard />
         <StravaCard status={status} />
+        <TelegramCard />
         <GarminImportCard />
         <SettingsCard />
       </div>

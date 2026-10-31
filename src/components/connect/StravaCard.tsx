@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { RefreshCw, Unlink } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { fetchStravaWorkouts, startStravaAuth, STRAVA_CLIENT_ID } from '../../lib/strava';
+import { disconnectStrava, fetchStravaWorkouts, markStravaSynced, startStravaAuth, STRAVA_CLIENT_ID } from '../../lib/strava';
 import { useStrava } from '../../store/strava';
 import { useWorkouts } from '../../store/workouts';
 import { Button } from '../ui/Button';
@@ -11,7 +11,7 @@ import { Card, CardTitle } from '../ui/Card';
 type Status = { kind: 'ok' | 'error'; text: string } | null;
 
 export function StravaCard({ status: externalStatus }: { status: Status }) {
-  const { tokens, athleteName, lastSyncAt, setLastSync, disconnect } = useStrava();
+  const { tokens, athleteName, lastSyncAt } = useStrava();
   const importMany = useWorkouts((s) => s.importMany);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -23,7 +23,7 @@ export function StravaCard({ status: externalStatus }: { status: Status }) {
     try {
       const list = await fetchStravaWorkouts();
       const added = importMany(list);
-      setLastSync(new Date().toISOString());
+      markStravaSynced(new Date().toISOString());
       setStatus({
         kind: 'ok',
         text: added
@@ -66,7 +66,10 @@ export function StravaCard({ status: externalStatus }: { status: Status }) {
             <Button
               variant="secondary"
               onClick={() => {
-                if (window.confirm('Desconectar o Strava? Os treinos já importados continuam salvos.')) disconnect();
+                if (!window.confirm('Desconectar o Strava? Os treinos já importados continuam salvos.')) return;
+                disconnectStrava().catch((e: unknown) =>
+                  setStatus({ kind: 'error', text: e instanceof Error ? e.message : 'Falha ao desconectar.' }),
+                );
               }}
               aria-label="Desconectar Strava"
             >

@@ -7,6 +7,9 @@ import '@fontsource/barlow-condensed/500.css';
 import '@fontsource/barlow-condensed/600.css';
 import './index.css';
 import App from './App';
+import { initSync } from './lib/sync';
+
+initSync();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

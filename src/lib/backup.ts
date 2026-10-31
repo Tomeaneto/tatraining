@@ -1,9 +1,10 @@
-import { useBody } from '../store/body';
+import { selectBaseline, useBody } from '../store/body';
 import { useSettings } from '../store/settings';
-import { useStrava } from '../store/strava';
 import { useWorkouts } from '../store/workouts';
 import type { Athlete, BodyComposition, ProgramSettings, Workout } from '../types';
 import { todayISO } from './dates';
+import { toUuid } from './id';
+import { disconnectStrava } from './strava';
 
 const FORMAT = 'ta-triathlon-backup';
 const VERSION = 1;
@@ -63,15 +64,21 @@ export function parseBackup(text: string): Backup {
 }
 
 export function restoreBackup(b: Backup): void {
+  // Ids em UUID (backups antigos usam `w-…`/`bc-…`); a linha de base fica com o id atual.
+  const baselineId = selectBaseline(useBody.getState().assessments).id;
   useSettings.setState({ athlete: b.athlete, program: b.program });
-  useWorkouts.setState({ workouts: b.workouts });
-  useBody.setState({ assessments: [...b.assessments].sort((x, y) => x.date.localeCompare(y.date)) });
+  useWorkouts.setState({ workouts: b.workouts.map((w) => ({ ...w, id: toUuid(w.id) })) });
+  useBody.setState({
+    assessments: b.assessments
+      .map((a) => ({ ...a, id: a.isBaseline ? baselineId : toUuid(a.id) }))
+      .sort((x, y) => x.date.localeCompare(y.date)),
+  });
 }
 
 /** Volta tudo ao estado inicial (linha de base do InBody, sem treinos, Strava desconectado). */
-export function resetAll(): void {
+export async function resetAll(): Promise<void> {
   useSettings.getState().reset();
   useWorkouts.getState().reset();
   useBody.getState().reset();
-  useStrava.getState().disconnect();
+  await disconnectStrava().catch((e: unknown) => console.warn('[strava] falha ao desconectar:', e));
 }

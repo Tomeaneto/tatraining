@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { newId } from '../lib/id';
+import { newId, toUuid } from '../lib/id';
 import type { ISODate, Session, Workout } from '../types';
 
 interface WorkoutsState {
@@ -23,7 +23,7 @@ export const useWorkouts = create<WorkoutsState>()(
   persist(
     (set, get) => ({
       workouts: [],
-      add: (w) => set((s) => ({ workouts: [{ ...w, id: newId('w') }, ...s.workouts].sort(byDateDesc) })),
+      add: (w) => set((s) => ({ workouts: [{ ...w, id: newId() }, ...s.workouts].sort(byDateDesc) })),
       update: (id, patch) =>
         set((s) => ({ workouts: s.workouts.map((w) => (w.id === id ? { ...w, ...patch } : w)).sort(byDateDesc) })),
       remove: (id) => set((s) => ({ workouts: s.workouts.filter((w) => w.id !== id) })),
@@ -31,14 +31,14 @@ export const useWorkouts = create<WorkoutsState>()(
         const seen = new Set(get().workouts.map((w) => `${w.source}:${w.externalId}`));
         const fresh = list
           .filter((w) => !w.externalId || !seen.has(`${w.source}:${w.externalId}`))
-          .map((w) => ({ ...w, id: newId('w') }));
+          .map((w) => ({ ...w, id: newId() }));
         if (fresh.length) set((s) => ({ workouts: [...fresh, ...s.workouts].sort(byDateDesc) }));
         return fresh.length;
       },
       completeSession: (session) => {
         if (get().workouts.some((w) => w.plannedDate === session.date)) return;
         const done: Workout[] = session.blocks.map((b) => ({
-          id: newId('w'),
+          id: newId(),
           date: session.date,
           sport: b.sport,
           durationMin: b.durationMin,
@@ -53,7 +53,16 @@ export const useWorkouts = create<WorkoutsState>()(
         set((s) => ({ workouts: s.workouts.filter((w) => !(w.source === 'plan' && w.plannedDate === date)) })),
       reset: () => set({ workouts: [] }),
     }),
-    { name: 'ta-workouts', version: 1 },
+    {
+      name: 'ta-workouts',
+      version: 2,
+      // v2: ids viram UUID (o formato das linhas no Supabase).
+      migrate: (persisted, version) => {
+        const s = persisted as { workouts?: Workout[] };
+        if (version < 2 && s.workouts) s.workouts = s.workouts.map((w) => ({ ...w, id: toUuid(w.id) }));
+        return s as WorkoutsState;
+      },
+    },
   ),
 );
 
