@@ -3,6 +3,7 @@ import { Layout } from './components/Layout';
 import { Composicao } from './pages/Composicao';
 import { Conectar } from './pages/Conectar';
 import { Dashboard } from './pages/Dashboard';
+import { Dieta } from './pages/Dieta';
 import { Plano } from './pages/Plano';
 import { Treinos } from './pages/Treinos';
 
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="plano" element={<Plano />} />
         <Route path="treinos" element={<Treinos />} />
         <Route path="composicao" element={<Composicao />} />
+        <Route path="dieta" element={<Dieta />} />
         <Route path="conectar" element={<Conectar />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
